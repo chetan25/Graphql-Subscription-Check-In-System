@@ -1,0 +1,19 @@
+{
+  "name": "graphql-chat-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "graphql-yoga": "^1.18.3"
+  },
+  "scripts": {
+    "start": "ts-node server.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^16.7.1",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.3.5"
+  },
+  "author": "chetandasauni",
+  "license": "ISC"
+}
