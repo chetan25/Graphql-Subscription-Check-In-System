@@ -1,7 +1,8 @@
 import { GraphQLServer, PubSub, withFilter  } from 'graphql-yoga';
 
-const GAME_CHANNLE = 'GAME_CHANNLE';
+const CHECK_IN_CHANNEL = 'CHECK_IN_CHANNEL';
 const GET_STATUS = 'GET_STATUS';
+const CHAT_MESSAGE = 'CHAT_MESSAGE';
 
 const pubSub = new PubSub();
 
@@ -14,6 +15,8 @@ type UserId = String;
 
 let connectedUsers: UserId[] = [];
 let playingUsers: UserId[] = [];
+let defaultWaitingTime = 5;
+const perCheckInTime = 5;
 
 const typeDefs = `
   type Message {
@@ -28,11 +31,13 @@ const typeDefs = `
       unSubscribe(id: String!): Boolean
   }
   type Subscription {
-      messages: [Message]!
-      getQueueStatus(id: String!): String!
+    messages: [Message]!
+    getQueueStatus(id: String!): String!
+    watingTime: String!
   } 
 `;
 
+  
 const resolvers = {
     Query: {
         getMessages: () => {
@@ -61,7 +66,7 @@ const resolvers = {
            const newMessage = {message, from};
            messages.push(newMessage);
            pubSub.publish(
-            GAME_CHANNLE,
+            CHAT_MESSAGE,
                {messages}
            )
            return newMessage;
@@ -91,8 +96,16 @@ const resolvers = {
     Subscription: {
         messages: {
             subscribe: () => {
-                const iterator =  pubSub.asyncIterator(GAME_CHANNLE);
-                pubSub.publish(GAME_CHANNLE, {messages});
+                const iterator =  pubSub.asyncIterator(CHAT_MESSAGE);
+                pubSub.publish(CHAT_MESSAGE, {messages});
+                return iterator;
+            }
+        },
+        watingTime: {
+            subscribe: () => {
+                const iterator =  pubSub.asyncIterator(CHECK_IN_CHANNEL);
+                const waitingTimeMessage = `Current waiting time is ${defaultWaitingTime} minutes`;
+                pubSub.publish(CHECK_IN_CHANNEL, {watingTime: waitingTimeMessage});
                 return iterator;
             }
         },
@@ -114,7 +127,10 @@ const resolvers = {
             subscribe: withFilter((_:unknown, args: {id: String}) => {
                 // console.log(rootValue, args, context, info);
                 const iterator =  pubSub.asyncIterator(GET_STATUS);
+                defaultWaitingTime += perCheckInTime;
+                
                 if(playingUsers.length == 0) {
+                    defaultWaitingTime = perCheckInTime;
                     playingUsers.push(args.id);
                     pubSub.publish(GET_STATUS, {playerOne: args.id});
                 } else if(playingUsers.length == 1) {
@@ -124,6 +140,8 @@ const resolvers = {
                     connectedUsers.push(args.id);
                     pubSub.publish(GET_STATUS, {other:  args.id});
                 }
+                const waitingTimeMessage = `Current waiting time is ${defaultWaitingTime} minutes`;
+                pubSub.publish(CHECK_IN_CHANNEL, {watingTime: waitingTimeMessage});
                 return iterator;
             }, 
             (payload, variables) => {
