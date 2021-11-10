@@ -17,12 +17,16 @@ import Box from '@material-ui/core/Box';
 import Divider from '@material-ui/core/Divider';
 import { useGlobalStore } from '../hooks/machine-context';
 import WelComeScreen from './welcome-screen';
+import CheckIn from './check-in';
 
 const useStyles = makeStyles((theme) => ({
     '@global': {
       a: {
         textDecoration: 'none',
       },
+    },
+    appContainer: {
+        marginTop: '2rem'
     },
     welcomeWrapper: {
         maxHeight: '100vh',
@@ -66,7 +70,7 @@ const useStyles = makeStyles((theme) => ({
 
 const GameApp = () => {
     const [state, send] = useGlobalStore();
-    const [playerStatus, setPlayerStatus] = useState('');
+    const [waitingTime, setWaitingTime] = useState<string | null>(null);
 
     const styles = useStyles();
     const client = useSubscriptionClient();
@@ -86,7 +90,7 @@ const GameApp = () => {
             ),
             subscribe(result => {
                 console.log({result})
-                setPlayerStatus(result.data.getQueueStatus);
+                // setPlayerStatus(result.data.getQueueStatus);
             })
         );
         send('CHECK_IN');
@@ -99,13 +103,13 @@ const GameApp = () => {
             client.subscription(
                 `
                     subscription {
-                        getWaitngTime
+                        watingTime
                     }
                 `
             ),
             subscribe(result => {
                 console.log({result})
-                setPlayerStatus(result.data.getQueueStatus);
+                setWaitingTime(result.data.watingTime);
             })
         )
 
@@ -124,7 +128,7 @@ const GameApp = () => {
 
 
     return (
-        <Container maxWidth="md">
+        <Container maxWidth="md" className={styles.appContainer}>
            <Typography
                 variant="h3"
                 color="inherit"
@@ -133,13 +137,22 @@ const GameApp = () => {
             >
                 Welcome To Self Serve
             </Typography>
+            {
+                waitingTime ? <Typography
+                 color="inherit"
+                 noWrap
+                 className={styles.header}
+             >
+                 {waitingTime}......
+             </Typography> : null
+            }
             <Divider variant='middle'/>
             <Box id="welcome" className={styles.welcomeWrapper}>
                {
                    state.matches('idle') ? <WelComeScreen startCheckIn={startCheckIn}/> : null
                }
                {
-                   state.matches('checkIn') ? <h2>Check IN</h2> : null
+                   state.matches('checkIn') ? <CheckIn /> : null
                }
                 {
                    state.matches('checkStatus') ? <h2>Check Status</h2> : null
