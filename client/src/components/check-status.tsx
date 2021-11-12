@@ -20,42 +20,37 @@ const useStyles = makeStyles((theme) => ({
     header: {
         textAlign: 'center'
     },
-    checkIn: {
+    checkStatus: {
         textAlign: 'center'
     }
   }));
 
-type CheckInProps = {
+type CheckStatusProps = {
   updateResult: (data: {
-     email: string, waitingStatus: {
+    email: string, waitingStatus: {
         status: string,
         message: string
-     },
-     type: string
+    },
+    type: string
   }) => void;
 }
 
-const CheckIn = ({updateResult}: CheckInProps) => {
+const CheckStatus = ({updateResult}: CheckStatusProps) => {
    const client = useSubscriptionClient();
    const [state, send] = useGlobalStore();
    const checkInSubs = useRef(()=> {});
    const styles = useStyles();
-   const [userName, setUserName] = useState('');
    const [email, setEmail] = useState('');
-
-   const handleUseNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setUserName(event.target.value);
-   }
 
    const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(event.target.value);
    }
 
-   const checkInUser = () => {
-      if(!email || !userName) {
+   const checkUserStatus = () => {
+      if(!email) {
         return;
       }
-      send('SUBMIT_CHECK_IN');
+      send('SUBMIT_CHECK_STATUS');
 
     //   const id = window.crypto.getRandomValues(new Uint32Array(1))[0].toString();
 
@@ -63,7 +58,7 @@ const CheckIn = ({updateResult}: CheckInProps) => {
           client.subscription(
               `
                   subscription($id: String!) {
-                      getQueueStatus(id: $id,  type: "check-in") {
+                      getQueueStatus(id: $id, type: "check-status") {
                           status,
                           message
                       }
@@ -76,10 +71,17 @@ const CheckIn = ({updateResult}: CheckInProps) => {
               updateResult({
                   email: email,
                   waitingStatus: result.data.getQueueStatus,
-                  type: 'check-in'
+                  type: 'check-status'
               });
-              send('CHECK_IN_COMPLETE');
-              if (result.data.getQueueStatus.status === 'done') {
+              if (result.data.getQueueStatus.status === 'not-found')  {
+                send('CHECK_STATUS_ERROR')
+              } else {
+                send('CHECK_STATUS_COMPLETE')
+              }
+              if (
+                result.data.getQueueStatus.status === 'done' ||
+                result.data.getQueueStatus.status === 'not-found'
+              ) {
                 checkInSubs.current();
               }
           })
@@ -87,42 +89,32 @@ const CheckIn = ({updateResult}: CheckInProps) => {
       checkInSubs.current = unsubscribe;
    }
 
-
    return (
-    <div className={styles.checkIn}>
+    <div className={styles.checkStatus}>
         <form className={styles.form} noValidate autoComplete="off">
-            <FormControl variant="outlined">
-                <InputLabel htmlFor="component-outlined">Name</InputLabel>
-                <OutlinedInput
-                    id="component-outlined"
-                    value={userName}
-                    onChange={handleUseNameChange}
-                    label="Name"
-                />
-            </FormControl>
-            <FormControl variant="outlined">
-                <InputLabel htmlFor="component-outlined">Email</InputLabel>
-                <OutlinedInput
-                    id="component-outlined"
-                    value={email}
-                    onChange={handleEmailChange}
-                    label="Email"
-                />
-            </FormControl>
-            <Button
-                variant="contained"
-                color="primary"
-                disabled={!email || !userName || state.matches('checkIn.processCheckIn')}
-                onClick={checkInUser}
-            >
-                Check-In
-            </Button>
-        </form>
-        {
-            state.matches('checkIn.processCheckIn') ? <CircularProgress disableShrink /> : null
-        }
+        <FormControl variant="outlined">
+            <InputLabel htmlFor="component-outlined">Email</InputLabel>
+            <OutlinedInput
+                id="component-outlined"
+                value={email}
+                onChange={handleEmailChange}
+                label="Email"
+            />
+        </FormControl>
+        <Button
+            variant="contained"
+            color="primary"
+            disabled={!email || state.matches('checkStatus.processCheckStatus')}
+            onClick={checkUserStatus}
+        >
+            Check Staus
+        </Button>
+    </form>
+    {
+        state.matches('checkStatus.processCheckStatus') ? <CircularProgress disableShrink /> : null
+    }
     </div> 
    );
 }
 
-export default CheckIn;
+export default CheckStatus;

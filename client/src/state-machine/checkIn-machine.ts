@@ -7,13 +7,18 @@ export type CheckInEvent =
     type: 'CHECK_IN'
 } | {
     type: 'SUBMIT_CHECK_IN',
-    value: {
-        name: string;
-        email: string;
-    }
 } | {
-    type: 'SUBMIT_CHECK_STATUS',
-    value: string
+    type: 'SUBMIT_CHECK_STATUS'
+} | {
+    type: 'CHECK_IN_COMPLETE'
+} | {
+    type: 'CHECK_IN_ERROR'
+} | {
+    type: 'CHECK_STATUS_COMPLETE'
+} | {
+    type: 'CHECK_STATUS_ERROR'
+} | {
+    type: 'START_AGAIN'
 }
 
 export type CheckInContext = {
@@ -75,15 +80,9 @@ const createCheckInMachine = () => {
                     }
                 },
                 processCheckIn: {
-                    invoke: {
-                        id: 'processCheckInRequest',
-                        src: 'processCheckInRequest',
-                        onDone: {
-                          target: '#checkInState.displayResults'
-                        },
-                        onError: {
-                          target: '#checkInState.failure'
-                        }
+                    on: {
+                        'CHECK_IN_COMPLETE': '#checkInState.displayResults',
+                        'CHECK_IN_ERROR': '#checkInState.failure'
                     }
                 }
                }
@@ -98,21 +97,22 @@ const createCheckInMachine = () => {
                         }
                     },
                     processCheckStatus: {
-                        invoke: {
-                            id: 'processCheckInRequest',
-                            src: 'processCheckInRequest',
-                            onDone: {
-                              target: '#checkInState.displayResults'
-                            },
-                            onError: {
-                              target: '#checkInState.failure'
-                            }
+                        on: {
+                            'CHECK_STATUS_COMPLETE': '#checkInState.displayResults',
+                            'CHECK_STATUS_ERROR': '#checkInState.failure'
                         }
                     }
                 }
             },
             displayResults: {},
-            failure: {}
+            failure: {
+                on: {
+                    'CHECK_IN': 'checkIn'
+                }
+            }
+        },
+        on: {
+            'START_AGAIN': 'idle',
         }
     });
 }

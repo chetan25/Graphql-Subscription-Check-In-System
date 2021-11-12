@@ -3,21 +3,16 @@ import { pipe, subscribe } from 'wonka';
 import { useSubscriptionClient } from '../hooks/subscription';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
-
-// import FormControl from '@material-ui/core/FormControl';
-// import InputLabel from '@material-ui/core/InputLabel';
-// import OutlinedInput from '@material-ui/core/OutlinedInput';
-// import Button from '@material-ui/core/Button';
-// import List from '@material-ui/core/List';
-// import ListItem from '@material-ui/core/ListItem';
-// import ListItemText from '@material-ui/core/ListItemText';
-
+import Button from '@material-ui/core/Button';
+import IconButton from '@material-ui/core/IconButton';
+import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 import Container from '@material-ui/core/Container';
 import Box from '@material-ui/core/Box';
 import Divider from '@material-ui/core/Divider';
 import { useGlobalStore } from '../hooks/machine-context';
 import WelComeScreen from './welcome-screen';
 import CheckIn from './check-in';
+import CheckStatus from './check-status';
 
 const useStyles = makeStyles((theme) => ({
     '@global': {
@@ -68,36 +63,28 @@ const useStyles = makeStyles((theme) => ({
     }
   }));
 
-const GameApp = () => {
+const OnlineReservation = () => {
     const [state, send] = useGlobalStore();
     const [waitingTime, setWaitingTime] = useState<string | null>(null);
+    const [checkInResult, setCheckInResult] = useState({
+        type: '',
+        message: '',
+        status: ''
+    });
 
     const styles = useStyles();
     const client = useSubscriptionClient();
 
     const startCheckIn = () => {
-        const id = window.crypto.getRandomValues(new Uint32Array(1))[0].toString();
-
-        const { unsubscribe: unsubscribeStatus } = pipe(
-            client.subscription(
-                `
-                    subscription($id: String!) {
-                        getQueueStatus(id: $id)
-                    }
-                `, {
-                    id: id
-                }
-            ),
-            subscribe(result => {
-                console.log({result})
-                // setPlayerStatus(result.data.getQueueStatus);
-            })
-        );
         send('CHECK_IN');
     }
 
+    const startAgain = () => {
+       send('START_AGAIN');
+    }
+
     useEffect(() => {
-        const id = window.crypto.getRandomValues(new Uint32Array(1))[0].toString();
+        // const id = window.crypto.getRandomValues(new Uint32Array(1))[0].toString();
 
         const { unsubscribe: unsubscribeStatus } = pipe(
             client.subscription(
@@ -108,27 +95,53 @@ const GameApp = () => {
                 `
             ),
             subscribe(result => {
-                console.log({result})
                 setWaitingTime(result.data.watingTime);
             })
         )
 
         return () => {
-            client.mutation(`
-                    mutation($id: String!){
-                        unSubscribe(id: $id)
-                    }
-            `, {
-                id: id
-            }).toPromise();
+            // client.mutation(`
+            //         mutation($id: String!){
+            //             unSubscribe(id: $id)
+            //         }
+            // `, {
+            //     id: id
+            // }).toPromise();
 
             unsubscribeStatus()
         }
     }, []);
 
+    const updateResult = ({ email, waitingStatus, type}: {
+         email: string, waitingStatus: {
+             status: string,
+             message: string
+         },
+         type: string
+      }) => {
+          let message = `${waitingStatus.message}`;
+          if (type === 'check-in' && status === 'success') {
+            message = `${message}. You can check your status anytime with your email address ${email}`
+          }
+        
+         setCheckInResult({
+             type,
+             message,
+             status: waitingStatus.status
+         })
+    }
 
     return (
         <Container maxWidth="md" className={styles.appContainer}>
+           
+            {  !state.matches('idle') ? <IconButton
+                    aria-label="back"
+                    size="small"
+                    onClick={startAgain}
+                >
+                    <ArrowBackIcon />
+                </IconButton> : null
+            }
            <Typography
                 variant="h3"
                 color="inherit"
@@ -152,13 +165,34 @@ const GameApp = () => {
                    state.matches('idle') ? <WelComeScreen startCheckIn={startCheckIn}/> : null
                }
                {
-                   state.matches('checkIn') ? <CheckIn /> : null
+                   state.matches('checkIn') ? <CheckIn updateResult={updateResult}/> : null
                }
                 {
-                   state.matches('checkStatus') ? <h2>Check Status</h2> : null
+                   state.matches('checkStatus') ? <CheckStatus updateResult={updateResult} /> : null
                 }
                 {
-                   state.matches('displayResults') ? <h2>Display Results</h2> : null
+                   state.matches('displayResults') ? (
+                    <div>
+                        <h2>Check In Status</h2>
+                        <p>{checkInResult.message}</p>
+                    </div>
+                   ) : null
+                }
+                 {
+                   state.matches('failure') ? (
+                    <div>
+                        <h2>{
+                            checkInResult.status === 'not-found' ? 
+                                'Opps Something went wrong' : 'Error!!!!'
+                         }</h2>
+                        <p>{checkInResult.message}</p>
+                        {
+                           checkInResult.status === 'not-found' ?
+                             <Button variant="contained" color="primary" onClick={startCheckIn}>Check-In</Button> :
+                             <Button variant="contained" color="primary" onClick={startAgain}>Go Back</Button>
+                        }
+                    </div>
+                   ) : null
                 }
             </Box>
             
@@ -166,4 +200,4 @@ const GameApp = () => {
     )
   }
 
-  export default GameApp;
+  export default OnlineReservation;

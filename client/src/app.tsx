@@ -1,13 +1,13 @@
 import React from 'react';
 import Container from '@material-ui/core/Container';
-import GameApp from './components/game';
+import OnlineReservation from './components/online-reservation';
 import { CheckInStateProvider } from './hooks/machine-context';
 
 const App = () => {
     return (
         <CheckInStateProvider>
             <Container maxWidth="md">
-                <GameApp/>
+                <OnlineReservation/>
             </Container>
         </CheckInStateProvider>
     )

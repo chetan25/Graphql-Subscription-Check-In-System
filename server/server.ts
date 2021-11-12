@@ -2,145 +2,93 @@ import { GraphQLServer, PubSub, withFilter  } from 'graphql-yoga';
 
 const CHECK_IN_CHANNEL = 'CHECK_IN_CHANNEL';
 const GET_STATUS = 'GET_STATUS';
-const CHAT_MESSAGE = 'CHAT_MESSAGE';
 
 const pubSub = new PubSub();
 
-const messages = [{
-    message: 'Welcome User',
-    from: 'Server'
-}];
+type UserEmail = String;
 
-type UserId = String;
-
-let connectedUsers: UserId[] = [];
-let playingUsers: UserId[] = [];
-let defaultWaitingTime = 5;
-const perCheckInTime = 5;
+let checkedInUsers: UserEmail[] = [];
+let defaultWaitingTime = 2;
+const perCheckInTime = 2;
+let currentWaitingTime = defaultWaitingTime;
 
 const typeDefs = `
-  type Message {
-    message: String!
-    from: String!
-  }
-  type Query {
-      getMessages: [Message]!
-  }
   type Mutation {
-      addMessage(message: String!, from: String!): Message
       unSubscribe(id: String!): Boolean
   }
+  type CheckInStatus {
+      status: String!,
+      message: String!
+  }
   type Subscription {
-    messages: [Message]!
-    getQueueStatus(id: String!): String!
+    getQueueStatus(id: String!, type: String!): CheckInStatus!
     watingTime: String!
-  } 
+  }
+  type Query {
+    _empty: String  
+  }
 `;
 
   
 const resolvers = {
-    Query: {
-        getMessages: () => {
-            return messages;
-        },
-        // getQueueStatus: () => {
-        //     const newUserId =  Math.floor(Math.random() * 10000).toString();
-        //     if(playingUsers.length == 0) {
-        //         playingUsers.push(newUserId);
-        //         return 'Player One';
-        //     }
-        //     if(playingUsers.length == 1) {
-        //         playingUsers.push(newUserId);
-        //         return 'Player Two';
-        //     }
-        //     connectedUsers.push(newUserId);
-        //     return connectedUsers.length.toString();
-        // }
-    },
+    // Query: { },
     Mutation: {
-       addMessage: (
-           _: unknown, // parental context
-           {message, from}: {message: string, from: string}, // usr arguments
-           { pubSub }: {pubSub: PubSub} // context from server
-        ) => {
-           const newMessage = {message, from};
-           messages.push(newMessage);
-           pubSub.publish(
-            CHAT_MESSAGE,
-               {messages}
-           )
-           return newMessage;
-       },
        unSubscribe: (
             _: unknown, // parental context
             {id}: {id: string}, // usr arguments
             { pubSub }: {pubSub: PubSub} // context from server
        ) => {
-            const index = playingUsers.findIndex(el => el === id);
-            if (index >= 0) {
-                // if present delete
-                const newPlayer = connectedUsers.shift();
-                if (newPlayer) {
-                    playingUsers[index] = newPlayer; 
-                } else {
-                    playingUsers = playingUsers.filter(el => el !== id);
-                }
-            } else {
-                connectedUsers = connectedUsers.filter(el => el !== id);
-            }
             pubSub.publish(GET_STATUS, {all: true});
 
             return true;
        }
     },
     Subscription: {
-        messages: {
-            subscribe: () => {
-                const iterator =  pubSub.asyncIterator(CHAT_MESSAGE);
-                pubSub.publish(CHAT_MESSAGE, {messages});
-                return iterator;
-            }
-        },
         watingTime: {
             subscribe: () => {
                 const iterator =  pubSub.asyncIterator(CHECK_IN_CHANNEL);
-                const waitingTimeMessage = `Current waiting time is ${defaultWaitingTime} minutes`;
+                const waitingTimeMessage = `Current waiting time is ${currentWaitingTime} minutes`;
                 pubSub.publish(CHECK_IN_CHANNEL, {watingTime: waitingTimeMessage});
                 return iterator;
             }
         },
         getQueueStatus: {
-            resolve: (payload: String[], args: {id: String}) => {
+            resolve: (payload: String[], args: {id: String, type: String}) => {
                 // Manipulate and return the new value
-                const index = playingUsers.findIndex(el => el === args.id);
-                if (index == 0) {
-                    return 'You are player one';
-                } else if(index == 1) {
-                    return 'You are player two';
-                } else {
-                    const waitingIndex = connectedUsers.findIndex(el => el === args.id);
-
-                    return ` You are ${waitingIndex + 1} in Queue`
+                const index = checkedInUsers.findIndex(el => el === args.id);
+                console.log(index, 'index');
+                if (index < 0 && args.type === 'check-status') {
+                    return {
+                        status: 'not-found',
+                        message: ` Seems like the email is not in the system, please check-in first `
+                    }
                 }
+                if (index < 0) {
+                    return {
+                        status: 'done',
+                        message: ` It's your time now to see the doctor `
+                    }
+                }
+                const waitingIndex = index + 1;
+                const waitTime = (waitingIndex * perCheckInTime);
 
+                return {
+                    status: 'success',
+                    message: ` You are ${waitingIndex} in Queue and wait time is ${waitTime} minutes `
+                }
             },
-            subscribe: withFilter((_:unknown, args: {id: String}) => {
+            subscribe: withFilter((_:unknown, args: {id: String, type: String}) => {
                 // console.log(rootValue, args, context, info);
                 const iterator =  pubSub.asyncIterator(GET_STATUS);
-                defaultWaitingTime += perCheckInTime;
-                
-                if(playingUsers.length == 0) {
-                    defaultWaitingTime = perCheckInTime;
-                    playingUsers.push(args.id);
-                    pubSub.publish(GET_STATUS, {playerOne: args.id});
-                } else if(playingUsers.length == 1) {
-                    playingUsers.push(args.id);
-                    pubSub.publish(GET_STATUS, {playerTwo: args.id});
-                } else {
-                    connectedUsers.push(args.id);
-                    pubSub.publish(GET_STATUS, {other:  args.id});
+
+                pubSub.publish(GET_STATUS, {userId: args.id});
+                const index = checkedInUsers.findIndex(el => el === args.id);
+                if (index < 0 && args.type === 'check-in') {
+                    checkedInUsers.push(args.id);
+                    currentWaitingTime += perCheckInTime;
                 }
-                const waitingTimeMessage = `Current waiting time is ${defaultWaitingTime} minutes`;
+
+                const waitingTimeMessage = `Current waiting time is ${currentWaitingTime} minutes`;
                 pubSub.publish(CHECK_IN_CHANNEL, {watingTime: waitingTimeMessage});
                 return iterator;
             }, 
@@ -148,20 +96,7 @@ const resolvers = {
                 console.log('variables', variables);
                 console.log('payload', payload);
                 // for playing user, we only want to retun once
-                if (
-                    (payload.playerOne && payload.playerOne === variables.id) ||
-                    (payload.playerTwo && payload.playerTwo === variables.id)
-                    ) {
-                    return true;
-                }
-                // for non playing users
-                if (payload.other && !playingUsers.includes(variables.id)) {
-                    return true;
-                }
-                if (payload.all) {
-                    return true;
-                }
-                return false;
+                return true;
             }),
         }
     }
@@ -175,7 +110,24 @@ const server = new GraphQLServer({
     }
 });
 
+const finishAppointment = () => {
+  if(checkedInUsers.length === 0) {
+      console.log('no user yet');
+      return;
+  }
+  console.log('inishing appointment');
+  const userId = checkedInUsers.shift();
+  currentWaitingTime = currentWaitingTime - defaultWaitingTime;
+  const waitingTimeMessage = `Current waiting time is ${currentWaitingTime} minutes`;
+  pubSub.publish(CHECK_IN_CHANNEL, {watingTime: waitingTimeMessage});
+  pubSub.publish(GET_STATUS, {userId: userId});
+}
+
 server.start(() => {
     console.log('Server started at port 4000');
+
+    setInterval(function(){ 
+        finishAppointment()
+    }, 40000);
 })
 
