@@ -1,7 +1,7 @@
 ---
-title: Online Spot Reservation.
-excerpt: Simple Graphql subscription based reservation system, with React based UI.
-Tools: ['Express', 'React', 'graphql-yoga', Webpack', 'XSTate', 'wonka', '@urql', 'subscriptions-transport-ws', 'material-ui']
+Title: Online Spot Reservation.
+Excerpt: Simple Graphql subscription based reservation system, with React based UI.
+Tech: "Express, React, graphql-yoga, Webpack, XSTate, wonka, @urql, subscriptions-transport-ws, material-ui"
 ---
 
 # Online Spot Reservation
